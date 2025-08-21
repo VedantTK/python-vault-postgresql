@@ -85,7 +85,7 @@ Demo for Hashicorp Vault for 3 tier application.
     !sudo docker exec -it demo-postgres env PGPASSWORD='iakN-uhxnYTG7vfprnMD' psql -U v-token-my-role-0ycGzdJEicJzneDWDAI0-1755506570     -d postgres -c "SELECT * FROM employees;"
 
 # vault secrets enable (transit and transform)
-    !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault secrets enable -path=transit     transit"
+    !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault secrets enable -path=transit transit"
     !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault secrets enable -path=transform transform"
     
     !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault write -f transit/keys/employee-key"
