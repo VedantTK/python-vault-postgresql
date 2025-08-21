@@ -3,7 +3,6 @@ import requests
 import configparser
 import base64
 import logging
-import re
 from flask import Flask, request, render_template_string
 
 # Configure logging to file and console
@@ -90,7 +89,7 @@ def vault_decrypt(ciphertext):
         logger.error(f"Decryption failed for '{ciphertext}': {str(e)}")
         raise
 
-# Encode (mask) SSN using Vault Transform
+# Encode (mask) SSN using Vault Transform (retained but unused for now)
 def vault_transform_encode_ssn(ssn_value):
     logger.debug(f"Encoding SSN: {ssn_value}")
     try:
@@ -112,7 +111,7 @@ def vault_transform_encode_ssn(ssn_value):
         logger.error(f"SSN encoding failed: {str(e)}")
         raise
 
-# Decode (unmask) SSN using Vault Transform
+# Decode (unmask) SSN using Vault Transform (retained but unused for now)
 def vault_transform_decode_ssn(encoded_value):
     logger.debug(f"Decoding SSN: {encoded_value}")
     try:
@@ -134,7 +133,7 @@ def vault_transform_decode_ssn(encoded_value):
         logger.error(f"SSN decoding failed: {str(e)}")
         raise
 
-# Encode (mask) phone number using Vault Transform
+# Encode (mask) phone number using Vault Transform (retained but unused for now)
 def vault_transform_encode_phone(phone_value):
     logger.debug(f"Encoding phone number: {phone_value}")
     try:
@@ -156,7 +155,7 @@ def vault_transform_encode_phone(phone_value):
         logger.error(f"Phone number encoding failed: {str(e)}")
         raise
 
-# Decode (unmask) phone number using Vault Transform
+# Decode (unmask) phone number using Vault Transform (retained but unused for now)
 def vault_transform_decode_phone(encoded_value):
     logger.debug(f"Decoding phone number: {encoded_value}")
     try:
@@ -383,12 +382,6 @@ base_template = '''
             padding: 1rem;
             font-size: 0.9rem;
         }
-        .note {
-            font-size: 0.9rem;
-            color: #4A4A4A;
-            margin-top: 1rem;
-            text-align: center;
-        }
         @media (max-width: 768px) {
             .content {
                 padding: 1rem;
@@ -468,10 +461,6 @@ def add_employee():
         # Basic input validation
         if not all([name, role, email, phone, ssn, address]):
             msg = '<div class="message error">All fields are required!</div>'
-        elif not re.match(r'^\d{10}$', phone):
-            msg = '<div class="message error">Phone number must be exactly 10 digits!</div>'
-        elif not re.match(r'^\d{9}$', ssn):
-            msg = '<div class="message error">SSN must be exactly 9 digits!</div>'
         else:
             conn = None
             cur = None
@@ -479,10 +468,10 @@ def add_employee():
                 conn = get_db_connection()
                 cur = conn.cursor()
                 
-                # Encrypt or mask sensitive fields
+                # Encrypt all sensitive fields using Transit
                 encrypted_email = vault_encrypt(email)
-                encrypted_phone = vault_transform_encode_phone(phone)
-                encrypted_ssn = vault_transform_encode_ssn(ssn)
+                encrypted_phone = vault_encrypt(phone)
+                encrypted_ssn = vault_encrypt(ssn)
                 encrypted_address = vault_encrypt(address)
                 
                 logger.debug(f"Inserting employee: {name}, {role}, {encrypted_email}, {encrypted_phone}, {encrypted_ssn}, {encrypted_address}")
@@ -549,29 +538,21 @@ def view_employees():
         rows = cur.fetchall()
         headers = [desc[0] for desc in cur.description]
         
-        # Decrypt or unmask sensitive fields
+        # Decrypt all sensitive fields using Transit
         decrypted_rows = []
         for row in rows:
             decrypted_row = list(row)
             try:
-                # Email (transit decryption)
-                if decrypted_row[3].startswith('vault:v1:'):
-                    decrypted_row[3] = vault_decrypt(decrypted_row[3])
-                # Phone number (transform unmasking)
-                if decrypted_row[4].isdigit() and len(decrypted_row[4]) == 10:
-                    decrypted_row[4] = vault_transform_decode_phone(decrypted_row[4])
-                # SSN (transform unmasking)
-                if decrypted_row[5].isdigit() and len(decrypted_row[5]) == 9:
-                    decrypted_row[5] = vault_transform_decode_ssn(decrypted_row[5])
-                # Address (transit decryption)
-                if decrypted_row[6].startswith('vault:v1:'):
-                    decrypted_row[6] = vault_decrypt(decrypted_row[6])
+                decrypted_row[3] = vault_decrypt(row[3]) if row[3].startswith('vault:v1:') else row[3]
+                decrypted_row[4] = vault_decrypt(row[4]) if row[4].startswith('vault:v1:') else row[4]
+                decrypted_row[5] = vault_decrypt(row[5]) if row[5].startswith('vault:v1:') else row[5]
+                decrypted_row[6] = vault_decrypt(row[6]) if row[6].startswith('vault:v1:') else row[6]
             except Exception as e:
-                logger.error(f"Decryption/unmasking error for row {row[0]} (name: {row[1]}): email='{row[3]}', phone='{row[4]}', ssn='{row[5]}', address='{row[6]}': {str(e)}")
-                decrypted_row[3] = f"[Error: {str(e)}]" if row[3].startswith('vault:v1:') else row[3]
-                decrypted_row[4] = f"[Error: {str(e)}]" if row[4].isdigit() and len(row[4]) == 10 else row[4]
-                decrypted_row[5] = f"[Error: {str(e)}]" if row[5].isdigit() and len(row[5]) == 9 else row[5]
-                decrypted_row[6] = f"[Error: {str(e)}]" if row[6].startswith('vault:v1:') else row[6]
+                logger.error(f"Decryption error for row {row[0]}: {str(e)}")
+                decrypted_row[3] = row[3]  # Keep original value if decryption fails
+                decrypted_row[4] = row[4]
+                decrypted_row[5] = row[5]
+                decrypted_row[6] = row[6]
             decrypted_rows.append(decrypted_row)
         
         content = '''
@@ -582,7 +563,6 @@ def view_employees():
                 {}
             </table>
         </div>
-        <div class="note">Note: SSN displays only the last four digits for security.</div>
         '''.format(
             ''.join([f'<th>{h}</th>' for h in headers]),
             ''.join(['<tr>' + ''.join([f'<td title="{str(col)}">{str(col)}</td>' for col in row]) + '</tr>' for row in decrypted_rows])
