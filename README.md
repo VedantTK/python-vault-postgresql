@@ -86,9 +86,9 @@ Demo for Hashicorp Vault for 3 tier application.
 
 # vault secrets enable (transit and transform)
     !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault secrets enable -path=transit     transit"
-    !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault secrets enable                   -path=transform transform"
+    !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault secrets enable -path=transform transform"
     
-    !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault write -f                         transit/keys/employee-key"
+    !sudo docker exec -i vault-enterprise sh -c "VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault write -f transit/keys/employee-key"
 
 # for transit and transform use case
     %%sh
